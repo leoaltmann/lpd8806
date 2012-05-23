@@ -30,6 +30,8 @@
 #define	ADMUX_B		0x42
 #define	ADC_START()			ADCSRA |= _BV(ADSC)
 
+#define	BUTTONMASK	0x04
+
 typedef struct {
 	uint8_t	pixel;
 	uint8_t	r;
@@ -48,10 +50,14 @@ typedef struct {
 	uint8_t	b;
 }	ATTR_PACKED pixel_t;
 
+extern pixel_t strip[];
+extern pixel_t nullstrip[];
+
 void	clearStrip(pixel_t strip[], uint8_t stripLen);
 int8_t	effect_rgbChecker(pixel_t strip[], uint8_t stripLen, uint8_t amplitude);
 void	effect_rgbStrobe(pixel_t strip[], uint8_t stripLen, uint8_t up, uint8_t down, uint8_t amplitude, uint8_t repeat);
 void	effect_colorFade(pixel_t strip[], uint16_t delay, uint8_t amplitude);
+void	effect_colorStrobe(pixel_t strip[], uint8_t stripLen, uint8_t up, uint8_t down, uint8_t amplitude);
 void	latchStrip(void (*spi_write_p)(uint8_t), uint8_t stripLen );
 void	writeStrip(pixel_t strip[], uint8_t stripLen, void (*spi_write_p)(uint8_t));
 void	init_spi(void);

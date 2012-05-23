@@ -29,6 +29,9 @@
 
 #include "LPD8806.h"
 
+pixel_t	strip[NUM_LEDS];
+pixel_t nullstrip[NUM_LEDS];
+
 int 	main(void) {
 	//init_ports();
 	//init_spi();
@@ -38,6 +41,7 @@ int 	main(void) {
 	PORTB = 0xFF;
 	DDRC	= 0x00;
 	DIDR0	= 0xFF;
+	DDRD 	= 0b11111010;	// PD2 as button input, PD0 as UART RX
 
 	init_spi();
 
@@ -47,29 +51,65 @@ int 	main(void) {
 		hardware_spi_write(0xF0);
 	}
 */
-	pixel_t	strip[NUM_LEDS];
+
+	clearStrip(nullstrip, NUM_LEDS);
 
 	clearStrip(strip, NUM_LEDS);
 	writeStrip(strip, NUM_LEDS, hardware_spi_write);
 	latchStrip(hardware_spi_write, NUM_LEDS);
 
-	uint8_t	offset = 0;
-
-	uint8_t	stripAddress = 0x00;
+/*	uint8_t	stripAddress = 0x00;
 
 	uint8_t	serial_inBuffer[SERIAL_INBUFFER_LEN];
 	uint8_t	serial_inPos = 0;
 	uint8_t	serial_rxState = 0;
 	uint8_t	serial_mask = 0;
-	uint8_t serial_packetLen = 0;
+	uint8_t serial_packetLen = 0; */
 
-	init_adc();
+//	init_adc();
 //	uint8_t offset = 0;
 
+	uint16_t	buttonTimer = 0;
+	uint16_t	resetTimer = 0;
+	uint8_t 	displayState = 0;
+
 	for ( ; ; ) {
-		uint16_t r = 0;
-		uint16_t g = 0;
-		uint16_t b = 0;
+		if (PORTD & BUTTONMASK) { // Button is pressed
+			buttonTimer++;
+			resetTimer = 0;
+		} else {	// Button is not pressed
+			if (buttonTimer > 1000) // holding the button
+				displayState = 0;
+			else if (buttonTimer > 30) // quick press
+				displayState++;
+			buttonTimer = 0;
+		}
+
+		switch (displayState) {
+			case 0:
+				effect_colorFade(strip, 20, 32);
+				break;
+			case 1:
+				effect_colorFade(strip, 10, 32);
+				break;
+			case 2:
+				effect_rgbChecker(strip, NUM_LEDS, 32);
+				writeStrip(strip, NUM_LEDS, hardware_spi_write);
+				latchStrip(hardware_spi_write, NUM_LEDS);
+				_delay_ms(300);
+				break;
+			case 3:
+				effect_colorStrobe(strip, NUM_LEDS, 20, 20, 32);
+				break;
+			case 4:
+				effect_rgbStrobe(strip, NUM_LEDS, 20, 20, 32, 3);
+				break;
+			default:
+				displayState = 0;
+				break;
+		}
+
+	}
 
 	/*	uint8_t j;
 		for (j=0; j<3; j++) {
@@ -107,7 +147,7 @@ int 	main(void) {
 
 		if (offset == 3) offset = 0;  */
 
-	}
+	
 
 
 /*	for ( ; ; ) {
@@ -210,18 +250,46 @@ void	clearStrip(pixel_t strip[], uint8_t stripLen) {
 	}
 }
 
-void	effect_rgbStrobe(pixel_t strip[], uint8_t stripLen, uint8_t up, uint8_t down, uint8_t amplitude) {
-	effect_rgbChecker(strip, stripLen, amplitude);
-	_delay_ms(up);
+void	effect_rgbStrobe(pixel_t strip[], uint8_t stripLen, uint8_t up, uint8_t down, uint8_t amplitude, uint8_t repeat) {
+
+	effect_rgbChecker(strip, stripLen, amplitude);	
 	uint8_t j;
 	for (j=0; j<repeat; j++){
-		
+		writeStrip(strip, stripLen, hardware_spi_write);
+		latchStrip(hardware_spi_write, stripLen);
+		_delay_ms(up);
+		writeStrip(nullstrip, stripLen, hardware_spi_write);
+		latchStrip(hardware_spi_write, stripLen);
+		_delay_ms(down);
 	}
-	clearStrip(strip, stripLen);
-	writeStrip(strip, NUM_LEDS, hardware_spi_write);
-	latchStrip(hardware_spi_write, NUM_LEDS);
+
+}
+
+void	effect_colorStrobe(pixel_t strip[], uint8_t stripLen, uint8_t up, uint8_t down, uint8_t amplitude) {
+	//TODO strobe a single color at a time across the whole strip
+	static uint8_t offset = 0;
+	if (amplitude > 0x7f) amplitude = 0x7f;
+	switch (offset) {
+		case 0:
+			setStripColor(strip, stripLen, amplitude, 0, 0);
+			break;
+		case 1:
+			setStripColor(strip, stripLen, 0, amplitude, 0);
+			break;
+		case 2:
+			setStripColor(strip, stripLen, 0, 0, amplitude);
+			break;
+		default:
+			offset = 0;
+			break;
+	}
+	writeStrip(strip, stripLen, hardware_spi_write);
+	latchStrip(hardware_spi_write, stripLen);
+	_delay_ms(up);
+	writeStrip(nullstrip, stripLen, hardware_spi_write);
+	latchStrip(hardware_spi_write, stripLen);
 	_delay_ms(down);
-} 
+}
 
 int8_t	effect_rgbChecker(pixel_t strip[], uint8_t stripLen, uint8_t amplitude) {
 	
@@ -255,8 +323,8 @@ int8_t	effect_rgbChecker(pixel_t strip[], uint8_t stripLen, uint8_t amplitude) {
 	index++;
 	if (index > 2) index = 0;
 
-	writeStrip(strip, NUM_LEDS, hardware_spi_write);
-	latchStrip(hardware_spi_write, NUM_LEDS);
+//	writeStrip(strip, NUM_LEDS, hardware_spi_write);
+//	latchStrip(hardware_spi_write, NUM_LEDS);
 
 	return 0;
 }
