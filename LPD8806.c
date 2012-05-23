@@ -18,7 +18,7 @@
 
 */
 
-#define	F_CPU 16000000UL
+#define	F_CPU 1000000UL
 
 #include <avr/io.h>
 #include <avr/interrupt.h>
@@ -64,13 +64,14 @@ int 	main(void) {
 	uint8_t serial_packetLen = 0;
 
 	init_adc();
+//	uint8_t offset = 0;
 
 	for ( ; ; ) {
 		uint16_t r = 0;
 		uint16_t g = 0;
 		uint16_t b = 0;
 
-		uint8_t j;
+	/*	uint8_t j;
 		for (j=0; j<3; j++) {
 			ADMUX = (j | 0xC0);	// Red on AN0, Green on AN1, Blue on AN2
 			ADC_START();
@@ -91,11 +92,13 @@ int 	main(void) {
 			}
 		}
 
-		setStripColor(strip, NUM_LEDS, r, g, b);
-		//effect_rgbChecker(strip, NUM_LEDS, offset++);
-		writeStrip(strip, NUM_LEDS, hardware_spi_write);
-		latchStrip(hardware_spi_write, NUM_LEDS);
-		_delay_ms(50);
+		setStripColor(strip, NUM_LEDS, r, g, b); */
+		//effect_rgbChecker(strip, NUM_LEDS, 32);
+		//effect_colorFade(strip, 10, 32);
+		effect_rgbStrobe(strip, NUM_LEDS, 10, 20, 40, 5);
+		//if (offset >= 3) offset = 0;
+
+		//_delay_ms(50);
 
 	/*	clearStrip(strip, NUM_LEDS);
 		writeStrip(strip, NUM_LEDS, hardware_spi_write);
@@ -207,28 +210,93 @@ void	clearStrip(pixel_t strip[], uint8_t stripLen) {
 	}
 }
 
-int8_t	effect_rgbChecker(pixel_t strip[], uint8_t stripLen, uint8_t offset) {
-	if ((stripLen < 0) || (offset > 2) || (offset < 0)) {
+void	effect_rgbStrobe(pixel_t strip[], uint8_t stripLen, uint8_t up, uint8_t down, uint8_t amplitude) {
+	effect_rgbChecker(strip, stripLen, amplitude);
+	_delay_ms(up);
+	uint8_t j;
+	for (j=0; j<repeat; j++){
+		
+	}
+	clearStrip(strip, stripLen);
+	writeStrip(strip, NUM_LEDS, hardware_spi_write);
+	latchStrip(hardware_spi_write, NUM_LEDS);
+	_delay_ms(down);
+} 
+
+int8_t	effect_rgbChecker(pixel_t strip[], uint8_t stripLen, uint8_t amplitude) {
+	
+	static uint8_t index = 0;
+
+	if ((stripLen < 0)) {//} || (offset > 2) || (offset < 0)) {
 		return -1;
 	}
+
+//	if (offset > 2) offset = 2;
+//	else if (offset < 0) offset = 0;
+	uint8_t offset = index;
+	if (amplitude > 0x7f) amplitude = 0x7f;
 	uint8_t i = 0;
 	do {
 		switch (offset) {
 			case 0:
-				setPixelColor(&strip[i], 0x7F, 0x00, 0x00);
+				setPixelColor(&strip[i], amplitude, 0x00, 0x00);
 				break;
 			case 1:
-				setPixelColor(&strip[i], 0x00, 0x7F, 0x00);
+				setPixelColor(&strip[i], 0x00, amplitude, 0x00);
 				break;
 			case 2:
-				setPixelColor(&strip[i], 0x00, 0x00, 0x7F);
+				setPixelColor(&strip[i], 0x00, 0x00, amplitude);
 				break;
 		}
 		offset++;
 		if (offset > 2) offset = 0;
 		i++;
 	}	while (i < stripLen);
+	index++;
+	if (index > 2) index = 0;
+
+	writeStrip(strip, NUM_LEDS, hardware_spi_write);
+	latchStrip(hardware_spi_write, NUM_LEDS);
+
 	return 0;
+}
+
+void	effect_colorFade(pixel_t strip[], uint16_t delay, uint8_t amplitude) {
+	static uint8_t mode = 0;
+	static uint8_t r;
+	static uint8_t g;
+	static uint8_t b;
+
+	switch (mode) {
+		case 0:
+			r = amplitude;
+			g = 0;
+			b = 0;
+			mode = 1;
+			break;
+		case 1:	// red state
+			r--;
+			g++;
+			if (g == amplitude) mode++;
+			break;
+		case 2: // green state
+			g--;
+			b++;
+			if (b == amplitude) mode++;
+			break;
+		case 3:	// blue state
+			b--;
+			r++;
+			if (r == amplitude) mode = 1;
+			break;
+		default:
+			mode = 0;
+	}
+	setStripColor(strip, NUM_LEDS, r, g, b);
+	writeStrip(strip, NUM_LEDS, hardware_spi_write);
+	latchStrip(hardware_spi_write, NUM_LEDS);
+	_delay_ms(delay);
+
 }
 
 int8_t	setStripColor(pixel_t strip[], uint8_t stripLen, uint8_t r, uint8_t g, uint8_t b) {
@@ -268,7 +336,7 @@ void	init_spi(void) {
 	1,0 SPR1:0: SPI Clock Rate
 	*/
 
-	SPCR = 0b01010011;
+	SPCR = 0b01010000;
 	/*	SPSR - SPI status register
 
 	7	SPIF: SPI interrupt flag
