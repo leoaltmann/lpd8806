@@ -41,7 +41,8 @@ int 	main(void) {
 	PORTB = 0xFF;
 	DDRC	= 0x00;
 	DIDR0	= 0xFF;
-	DDRD 	= 0b11111010;	// PD2 as button input, PD0 as UART RX
+	DDRD 	= 0b11111011;	// PD2 as button input, PD0 as UART RX
+	PORTD = 0;
 
 	init_spi();
 
@@ -74,7 +75,7 @@ int 	main(void) {
 	uint8_t 	displayState = 0;
 
 	for ( ; ; ) {
-		if (PORTD & BUTTONMASK) { // Button is pressed
+	/*	if (PORTD & BUTTONMASK) { // Button is pressed
 			buttonTimer++;
 			resetTimer = 0;
 		} else {	// Button is not pressed
@@ -83,11 +84,18 @@ int 	main(void) {
 			else if (buttonTimer > 30) // quick press
 				displayState++;
 			buttonTimer = 0;
+		}  */
+
+		if ((PIND & BUTTONMASK)==0) {
+			if (buttonTimer == 0) displayState++;
+			buttonTimer = 1;
+		} else {
+			buttonTimer = 0;
 		}
 
 		switch (displayState) {
 			case 0:
-				effect_colorFade(strip, 20, 32);
+				effect_colorFade(strip, 100, 32);
 				break;
 			case 1:
 				effect_colorFade(strip, 10, 32);
@@ -289,6 +297,8 @@ void	effect_colorStrobe(pixel_t strip[], uint8_t stripLen, uint8_t up, uint8_t d
 	writeStrip(nullstrip, stripLen, hardware_spi_write);
 	latchStrip(hardware_spi_write, stripLen);
 	_delay_ms(down);
+	offset++;
+	if (offset == 3) offset = 0;
 }
 
 int8_t	effect_rgbChecker(pixel_t strip[], uint8_t stripLen, uint8_t amplitude) {
