@@ -4,7 +4,7 @@
 
 #define ATTR_PACKED      __attribute__ ((packed))
 
-#define	NUM_LEDS	32
+#define	NUM_LEDS	6
 #define	SERIAL_INBUFFER_LEN		32
 
 #define	RX_State_first_byte			0
